@@ -430,37 +430,6 @@ def main():
     st.set_page_config(page_title="Supafund Prediction Pipeline", layout="wide")
     st.title("🤖 Supafund Prediction Pipeline Prototype")
 
-    # --- Secrets Debugger ---
-    st.subheader("Secrets / Environment Variable Check")
-    
-    def check_secret(secret_name):
-        if secret_name in os.environ and os.environ[secret_name]:
-            st.success(f"✅ Secret '{secret_name}' found.")
-            return True
-        else:
-            st.error(f"❌ Secret '{secret_name}' not found. Please verify it in your Streamlit Cloud secrets configuration.")
-            return False
-
-    secrets_ok = all([
-        check_secret("OPENAI_API_KEY"),
-        check_secret("NEXT_PUBLIC_SUPABASE_URL"),
-        check_secret("SUPABASE_SERVICE_ROLE_KEY")
-    ])
-
-    if not secrets_ok:
-        st.warning("One or more secrets are missing. The application will not be able to run correctly. Please follow the instructions below to configure your secrets.")
-        st.code("""
-# In your Streamlit Cloud settings, go to the "Secrets" section for this app.
-# Paste the following content, replacing the placeholder values with your real keys.
-# Ensure the formatting is exactly as shown.
-
-NEXT_PUBLIC_SUPABASE_URL = "YOUR_SUPABASE_URL_HERE"
-SUPABASE_SERVICE_ROLE_KEY = "YOUR_SUPABASE_KEY_HERE"
-OPENAI_API_KEY = "YOUR_OPENAI_KEY_HERE"
-        """, language="toml")
-        st.stop()
-
-
     pipeline = get_pipeline()
     applications = pipeline._supafund_client.get_all_applications()
 
