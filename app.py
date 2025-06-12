@@ -433,129 +433,147 @@ def main():
     pipeline = get_pipeline()
     applications = pipeline._supafund_client.get_all_applications()
 
+    # Create a mapping for the selectbox and ensure it's available
+    app_options = {}
+    if applications:
+        app_options = {
+            app['id']: f"{app.get('projects', {}).get('name', 'N/A')} - {app.get('funding_programs', {}).get('name', 'N/A')}"
+            for app in applications
+        }
+
+    # --- Initialize or update session state from user actions ---
+    # This block now runs before any widgets that depend on this state are drawn.
+    if "selected_app_id" not in st.session_state:
+        st.session_state.selected_app_id = next(iter(app_options.keys()), None)
+
+    # --- Sidebar ---
     st.sidebar.header("Configuration")
 
-    if not applications:
-        st.warning("Could not fetch applications. Please check the connection and database.")
-        st.sidebar.warning("No applications to select.")
-        return
+    if app_options:
+        # Determine the index of the currently selected app
+        try:
+            current_selection_index = list(app_options.keys()).index(st.session_state.selected_app_id)
+        except ValueError:
+            current_selection_index = 0
 
-    # --- Click-to-select Logic ---
-    # Determine the selected_app_id for this run, prioritizing dataframe clicks
-    selected_app_id = None
-    if "app_grid" in st.session_state and st.session_state.app_grid.selection.rows:
-        selected_row_index = st.session_state.app_grid.selection.rows[0]
-        selected_app_id = applications[selected_row_index]['id']
-    elif "selected_app_id" in st.session_state:
-        selected_app_id = st.session_state.selected_app_id
-    
-    # Fallback to the first application if none of the above are true
-    if not selected_app_id and applications:
-        selected_app_id = applications[0]['id']
+        # Let the user change the selection via the selectbox
+        selectbox_choice = st.sidebar.selectbox(
+            "Select Application to Analyze",
+            options=list(app_options.keys()),
+            format_func=lambda app_id: app_options.get(app_id, "Unknown Application"),
+            index=current_selection_index
+        )
+        
+        # If the selectbox value changes, update session state and rerun
+        if selectbox_choice != st.session_state.selected_app_id:
+            st.session_state.selected_app_id = selectbox_choice
+            # Clear old results when selection changes
+            if 'prediction_results' in st.session_state:
+                del st.session_state['prediction_results']
+            st.rerun()
 
-    # Set the determined ID back into the session state for the selectbox to use
-    st.session_state.selected_app_id = selected_app_id
+        market_question = st.sidebar.text_area(
+            "Market Question",
+            "Will this project get accepted into the program?",
+            height=100,
+        )
 
-    # Create a list of formatted strings for the selectbox
-    app_options = {
-        app['id']: f"{app['projects']['name']} - {app['funding_programs']['name']} ({app['status']})"
-        for app in applications
-        if app.get('projects') and app.get('funding_programs') # Ensure joins were successful
-    }
-    
-    # Find the index for the selectbox to set the default
-    try:
-        # Get all possible IDs from the options dictionary
-        option_ids = list(app_options.keys())
-        default_index = option_ids.index(selected_app_id)
-    except (ValueError, TypeError): # Handle cases where selected_app_id is None or not in list
-        default_index = 0
+        st.sidebar.subheader("User Weights (from Pearl)")
+        user_weights = {
+            "founder": st.sidebar.slider("Founder", 0.0, 1.0, 0.4, 0.05),
+            "market": st.sidebar.slider("Market", 0.0, 1.0, 0.25, 0.05),
+            "technical": st.sidebar.slider("Technical", 0.0, 1.0, 0.2, 0.05),
+            "social": st.sidebar.slider("Social", 0.0, 1.0, 0.1, 0.05),
+            "tokenomics": st.sidebar.slider("Tokenomics", 0.0, 1.0, 0.05, 0.05),
+        }
 
-    st.sidebar.selectbox(
-        "Select Application to Analyze",
-        options=list(app_options.keys()),
-        format_func=lambda app_id: app_options.get(app_id, "Unknown Application"),
-        index=default_index,
-        key="selected_app_id" # This ensures the selectbox state is managed in the session
-    )
+        if st.sidebar.button("Generate Prediction", use_container_width=True, type="primary"):
+            active_app_id = st.session_state.selected_app_id
+            if active_app_id:
+                with st.spinner("Running prediction pipeline... Please wait."):
+                    inputs = {
+                        "application_id": active_app_id,
+                        "market_question": market_question,
+                        "user_weights": user_weights,
+                    }
+                    final_state = pipeline.workflow.invoke(inputs)
+                    # Store results in session state to display them
+                    st.session_state.prediction_results = final_state
+            else:
+                st.sidebar.error("Please select an application.")
+    else:
+        st.sidebar.warning("No applications found to configure.")
 
-    market_question = st.sidebar.text_area(
-        "Market Question",
-        "Will this project get accepted into the program?",
-        height=100,
-    )
-
-    st.sidebar.subheader("User Weights (from Pearl)")
-    user_weights = {
-        "founder": st.sidebar.slider("Founder", 0.0, 1.0, 0.4, 0.05),
-        "market": st.sidebar.slider("Market", 0.0, 1.0, 0.25, 0.05),
-        "technical": st.sidebar.slider("Technical", 0.0, 1.0, 0.2, 0.05),
-        "social": st.sidebar.slider("Social", 0.0, 1.0, 0.1, 0.05),
-        "tokenomics": st.sidebar.slider("Tokenomics", 0.0, 1.0, 0.05, 0.05),
-    }
 
     # --- Main Area ---
     st.header("All Applications")
-    st.dataframe(
-        applications,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="app_grid",
-        hide_index=True,
-    )
 
-    if st.sidebar.button("Generate Prediction", use_container_width=True):
-        # Use the ID from the session state, which is the single source of truth
-        active_app_id = st.session_state.selected_app_id
-        if not active_app_id:
-            st.error("Please select an application from the sidebar.")
-            return
+    if not applications:
+        st.info("No applications found in the database. When new applications are submitted, they will appear here.")
+    else:
+        # Create a 4-column layout for the collection view
+        cols = st.columns(4)
+        for index, app in enumerate(applications):
+            col = cols[index % 4]
+            with col:
+                with st.container(border=True):
+                    # Safely get project and program names
+                    project_name = app.get('projects', {}).get('name', 'Unknown Project')
+                    program_name = app.get('funding_programs', {}).get('name', 'Unknown Program')
 
-        inputs = {
-            "application_id": active_app_id,
-            "market_question": market_question,
-            "user_weights": user_weights,
-        }
+                    st.subheader(project_name)
+                    st.caption(f"applying for {program_name}")
+                    
+                    st.write("") 
 
-        # Setup columns for displaying results
-        col1, col2 = st.columns(2)
+                    if st.button("Analyze", key=f"select_{app['id']}", use_container_width=True):
+                        # On button click, just update the state and rerun.
+                        # The selectbox will automatically update on the rerun.
+                        st.session_state.selected_app_id = app['id']
+                        # Clear old results when a new analysis is triggered this way
+                        if 'prediction_results' in st.session_state:
+                            del st.session_state['prediction_results']
+                        st.rerun()
 
-        with st.spinner("Running prediction pipeline... Please wait."):
-            final_state = pipeline.workflow.invoke(inputs)
+    st.divider()
 
+    # Display results if they exist in the session state
+    if "prediction_results" in st.session_state:
         st.header("Prediction Results")
+        final_state = st.session_state.prediction_results
 
         if final_state.get("error_message"):
             st.error(f"An error occurred: {final_state['error_message']}")
-            return
-
-        prediction = final_state.get("prediction", {})
-        
-        with col1:
-            st.subheader("🔮 Prediction")
-            pred_val = prediction.get("prediction", "N/A")
-            if pred_val == "YES":
-                st.success("YES")
-            else:
-                st.error("NO")
+        else:
+            prediction = final_state.get("prediction", {})
             
-            confidence = prediction.get("confidence", 0.0)
-            st.metric(label="Confidence", value=f"{confidence:.1%}")
+            # Setup columns for displaying results
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("🔮 Prediction")
+                pred_val = prediction.get("prediction", "N/A")
+                if pred_val == "YES":
+                    st.success("YES")
+                else:
+                    st.error("NO")
+                
+                confidence = prediction.get("confidence", 0.0)
+                st.metric(label="Confidence", value=f"{confidence:.1%}")
 
-            st.subheader("💬 Reasoning")
-            st.info(prediction.get("reasoning", "No reasoning provided."))
+                st.subheader("💬 Reasoning")
+                st.info(prediction.get("reasoning", "No reasoning provided."))
 
-        with col2:
-            st.subheader("📊 Feature Breakdown")
-            st.json(prediction.get("feature_breakdown", {}))
+            with col2:
+                st.subheader("📊 Feature Breakdown")
+                st.json(prediction.get("feature_breakdown", {}))
 
-        with st.expander("Show LLM Prompt"):
-            st.text_area("LLM Input Prompt", final_state.get("llm_prompt", "Prompt not generated."), height=400)
+            with st.expander("Show LLM Prompt"):
+                st.text_area("LLM Input Prompt", final_state.get("llm_prompt", "Prompt not generated."), height=400)
 
-        with st.expander("Show Raw State"):
-            # A version of the state that's safe to display (no sensitive data)
-            display_state = {k: v for k, v in final_state.items() if k not in ['llm_client']}
-            st.json(display_state, expanded=True)
+            with st.expander("Show Raw State"):
+                # A version of the state that's safe to display (no sensitive data)
+                display_state = {k: v for k, v in final_state.items() if k not in ['llm_client']}
+                st.json(display_state, expanded=True)
 
 
 if __name__ == "__main__":
