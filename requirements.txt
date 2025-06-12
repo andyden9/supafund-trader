@@ -1,0 +1,8 @@
+streamlit
+langgraph
+supabase
+openai
+python-dotenv
+pandas
+requests
+lark 
