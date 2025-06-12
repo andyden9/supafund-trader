@@ -10,9 +10,9 @@ from openai import OpenAI
 
 # --- Environment and API Clients ---
 
-# Explicitly load .env from the script's directory to ensure keys are found
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(dotenv_path=dotenv_path)
+# Load .env file for local development. 
+# In Streamlit Cloud, secrets are passed as environment variables directly.
+load_dotenv()
 
 # Correctly load Supabase credentials from environment variables
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
