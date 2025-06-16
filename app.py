@@ -18,6 +18,141 @@ load_dotenv()
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
+# --- Weight Definitions ---
+
+WEIGHT_DEFINITIONS = {
+    "founder": {
+        "name": "Founder & Team Analysis",
+        "description": "Evaluates team experience, track record, and domain expertise",
+        "levels": {
+            1: {
+                "label": "Minimal Focus",
+                "description": "Team background is secondary consideration; accept promising projects regardless of founder experience"
+            },
+            2: {
+                "label": "Basic Consideration", 
+                "description": "Some team evaluation but willing to overlook inexperience for strong technical/market potential"
+            },
+            3: {
+                "label": "Moderate Importance",
+                "description": "Balanced view of team capabilities; prefer experienced founders but not dealbreaker"
+            },
+            4: {
+                "label": "High Priority",
+                "description": "Strong emphasis on proven track record, domain expertise, and execution capability"
+            },
+            5: {
+                "label": "Critical Factor",
+                "description": "Team quality is paramount; only back projects with exceptional founder pedigree and demonstrated success"
+            }
+        }
+    },
+    "market": {
+        "name": "Market Opportunity Analysis",
+        "description": "Assesses market size, growth potential, and competitive landscape", 
+        "levels": {
+            1: {
+                "label": "Minimal Focus",
+                "description": "Market size less important; willing to bet on early/experimental markets with unclear demand"
+            },
+            2: {
+                "label": "Basic Consideration",
+                "description": "Some market validation preferred but accept niche or speculative opportunities"
+            },
+            3: {
+                "label": "Moderate Importance", 
+                "description": "Balanced market assessment; prefer growing markets but open to emerging sectors"
+            },
+            4: {
+                "label": "High Priority",
+                "description": "Strong market validation required; focus on sizeable, fast-growing addressable markets"
+            },
+            5: {
+                "label": "Critical Factor",
+                "description": "Market opportunity must be massive and well-validated; only invest in proven, high-growth sectors"
+            }
+        }
+    },
+    "technical": {
+        "name": "Github Analysis", 
+        "description": "Evaluates code quality, development activity, and technical innovation",
+        "levels": {
+            1: {
+                "label": "Minimal Focus",
+                "description": "Technical implementation secondary; focus on vision/market over current development state"
+            },
+            2: {
+                "label": "Basic Consideration",
+                "description": "Some technical review but accept early-stage projects with limited development activity"
+            },
+            3: {
+                "label": "Moderate Importance",
+                "description": "Balanced technical assessment; prefer active development but not mandatory"
+            },
+            4: {
+                "label": "High Priority", 
+                "description": "Strong technical execution required; emphasize code quality, innovation, and development momentum"
+            },
+            5: {
+                "label": "Critical Factor",
+                "description": "Technical excellence paramount; only back projects with breakthrough innovation and exceptional development velocity"
+            }
+        }
+    },
+    "social": {
+        "name": "Social/Sentiment Analysis",
+        "description": "Measures community engagement, social media presence, and sentiment",
+        "levels": {
+            1: {
+                "label": "Minimal Focus", 
+                "description": "Community size irrelevant; focus on fundamentals over social metrics and hype"
+            },
+            2: {
+                "label": "Basic Consideration",
+                "description": "Some community awareness helpful but not essential for investment decision"
+            },
+            3: {
+                "label": "Moderate Importance",
+                "description": "Balanced community evaluation; prefer engaged audiences but not dealbreaker"
+            },
+            4: {
+                "label": "High Priority",
+                "description": "Strong community essential; emphasize social proof, engagement quality, and positive sentiment"
+            },
+            5: {
+                "label": "Critical Factor",
+                "description": "Community dominance required; only invest in projects with massive, highly engaged, passionate communities"
+            }
+        }
+    },
+    "tokenomics": {
+        "name": "Tokenomics Analysis",
+        "description": "Analyzes token distribution, utility, and economic model",
+        "levels": {
+            1: {
+                "label": "Minimal Focus",
+                "description": "Token design secondary; accept experimental or undefined tokenomics for strong projects"
+            },
+            2: {
+                "label": "Basic Consideration", 
+                "description": "Some token utility preferred but flexible on economic model details"
+            },
+            3: {
+                "label": "Moderate Importance",
+                "description": "Balanced tokenomics review; prefer clear utility but open to innovative approaches"
+            },
+            4: {
+                "label": "High Priority",
+                "description": "Strong tokenomics required; emphasize sustainable economics, clear utility, and fair distribution"
+            },
+            5: {
+                "label": "Critical Factor",
+                "description": "Tokenomics excellence mandatory; only invest in projects with revolutionary economic models and perfect token design"
+            }
+        }
+    }
+}
+
 # --- State Definition ---
 
 class AgentState(TypedDict):
@@ -206,13 +341,16 @@ class FeatureAssembler:
         project_data: Dict[str, Any],
         program_data: Dict[str, Any],
         realtime_signals: Dict[str, Any],
-        user_weights: Dict[str, float],
+        user_weights: Dict[str, int],
     ) -> Dict[str, Any]:
         """Assembles a feature dictionary from various data sources."""
         supafund_scores = project_data["ai_evaluation"]
         
+        # Normalize user weights to 0-1 scale for calculation
+        normalized_weights = {k: v / 5.0 for k, v in user_weights.items()}
+        
         weighted_score = sum(
-            score * user_weights.get(dimension.replace('_score', ''), 0.0)
+            score * normalized_weights.get(dimension.replace('_score', ''), 0.0)
             for dimension, score in supafund_scores.items()
         )
 
@@ -322,10 +460,10 @@ Program fit analysis score: {features.get('program_fit_score', 0):.2f}
 Historical program acceptance rate: {features.get('program_acceptance_rate', 0):.1%}
 Days until deadline: {features.get('days_before_deadline', 'N/A')}
 
---- USER PREFERENCES (from Pearl) ---
-- Founder priority: {user_weights.get('founder', 'N/A')}
-- Market priority: {user_weights.get('market', 'N/A')}
-- Technical priority: {user_weights.get('technical', 'N/A')}
+--- USER EVALUATION PRIORITIES ---
+You have been given specific evaluation priorities by the user. Here are their weights and what each level means:
+
+{self._format_user_priorities(user_weights)}
 
 --- FINAL INSTRUCTION ---
 Analyze all the provided information. Prioritize the qualitative information from descriptions and analysis reports over just the scores. In your reasoning, explicitly reference how the project's materials and our internal analysis align (or misalign) with the program's description and goals.
@@ -337,6 +475,23 @@ Provide a JSON object with the following structure:
     "reasoning": "Detailed explanation incorporating all context, especially project/program fit."
 }}
 """
+    
+    def _format_user_priorities(self, user_weights: Dict[str, int]) -> str:
+        """Formats user priorities with detailed descriptions for the LLM prompt."""
+        formatted_priorities = []
+        
+        for dimension, weight_value in user_weights.items():
+            if dimension in WEIGHT_DEFINITIONS:
+                config = WEIGHT_DEFINITIONS[dimension]
+                level_info = config['levels'][weight_value]
+                
+                formatted_priorities.append(f"""
+**{config['name']} (Priority Level: {weight_value}/5)**
+- Focus Level: {level_info['label']}
+- Evaluation Approach: {level_info['description']}
+""")
+        
+        return "\n".join(formatted_priorities)
 
 # --- LangGraph State and Workflow ---
 
@@ -478,18 +633,58 @@ def main():
             height=100,
         )
 
-        st.sidebar.subheader("User Weights (from Pearl)")
-        user_weights = {
-            "founder": st.sidebar.slider("Founder", 0.0, 1.0, 0.4, 0.05),
-            "market": st.sidebar.slider("Market", 0.0, 1.0, 0.25, 0.05),
-            "technical": st.sidebar.slider("Technical", 0.0, 1.0, 0.2, 0.05),
-            "social": st.sidebar.slider("Social", 0.0, 1.0, 0.1, 0.05),
-            "tokenomics": st.sidebar.slider("Tokenomics", 0.0, 1.0, 0.05, 0.05),
-        }
+        st.sidebar.subheader("User Evaluation Priorities")
+        st.sidebar.caption("Allocate up to 15 points total across all dimensions")
+        
+        # Initialize weights in session state if not present
+        if 'user_weights' not in st.session_state:
+            st.session_state.user_weights = {
+                "founder": 3,
+                "market": 3, 
+                "technical": 3,
+                "social": 3,
+                "tokenomics": 3
+            }
+        
+        user_weights = {}
+        total_points = 0
+        
+        for dimension, config in WEIGHT_DEFINITIONS.items():
+            current_value = st.session_state.user_weights.get(dimension, 3)
+            
+            # Create selectbox for weight level
+            selected_level = st.sidebar.selectbox(
+                f"{config['name']}",
+                options=[1, 2, 3, 4, 5],
+                index=current_value - 1,
+                key=f"weight_{dimension}",
+                help=config['description']
+            )
+            
+            user_weights[dimension] = selected_level
+            total_points += selected_level
+            
+            # Show the description for selected level
+            level_info = config['levels'][selected_level]
+            st.sidebar.caption(f"**{level_info['label']}:** {level_info['description']}")
+            st.sidebar.write("")  # Add spacing
+        
+        # Update session state
+        st.session_state.user_weights = user_weights
+        
+        # Display total points and validation
+        if total_points > 15:
+            st.sidebar.error(f"⚠️ Total points: {total_points}/15 (Over limit!)")
+            st.sidebar.warning("Please reduce some weights to proceed.")
+            weights_valid = False
+        else:
+            st.sidebar.success(f"✅ Total points: {total_points}/15")
+            weights_valid = True
 
-        if st.sidebar.button("Generate Prediction", use_container_width=True, type="primary"):
+        predict_button_disabled = not weights_valid
+        if st.sidebar.button("Generate Prediction", use_container_width=True, type="primary", disabled=predict_button_disabled):
             active_app_id = st.session_state.selected_app_id
-            if active_app_id:
+            if active_app_id and weights_valid:
                 with st.spinner("Running prediction pipeline... Please wait."):
                     inputs = {
                         "application_id": active_app_id,
@@ -499,8 +694,10 @@ def main():
                     final_state = pipeline.workflow.invoke(inputs)
                     # Store results in session state to display them
                     st.session_state.prediction_results = final_state
-            else:
+            elif not active_app_id:
                 st.sidebar.error("Please select an application.")
+            elif not weights_valid:
+                st.sidebar.error("Please ensure total weights do not exceed 15 points.")
     else:
         st.sidebar.warning("No applications found to configure.")
 
