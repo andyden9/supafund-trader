@@ -460,22 +460,41 @@ Program fit analysis score: {features.get('program_fit_score', 0):.2f}
 Historical program acceptance rate: {features.get('program_acceptance_rate', 0):.1%}
 Days until deadline: {features.get('days_before_deadline', 'N/A')}
 
+--- EVALUATION FRAMEWORK DEFINITIONS ---
+{self._format_weight_definitions()}
+
 --- USER EVALUATION PRIORITIES ---
-You have been given specific evaluation priorities by the user. Here are their weights and what each level means:
+Based on the evaluation framework above, the user has set the following specific priorities for this analysis:
 
 {self._format_user_priorities(user_weights)}
 
 --- FINAL INSTRUCTION ---
-Analyze all the provided information. Prioritize the qualitative information from descriptions and analysis reports over just the scores. In your reasoning, explicitly reference how the project's materials and our internal analysis align (or misalign) with the program's description and goals.
+Analyze all the provided information using the evaluation framework and user priorities defined above. Prioritize the qualitative information from descriptions and analysis reports over just the scores. In your reasoning, explicitly reference how the project's materials and our internal analysis align (or misalign) with the program's description and goals, while considering the user's specific evaluation priorities.
 
 Provide a JSON object with the following structure:
 {{
     "prediction": "YES|NO",
     "confidence": float,
-    "reasoning": "Detailed explanation incorporating all context, especially project/program fit."
+    "reasoning": "Detailed explanation incorporating all context, especially project/program fit and user evaluation priorities."
 }}
 """
     
+    def _format_weight_definitions(self) -> str:
+        """Formats complete weight definitions framework for the LLM prompt."""
+        formatted_definitions = []
+        
+        for dimension, config in WEIGHT_DEFINITIONS.items():
+            dimension_text = f"\n**{config['name']}**\n{config['description']}\n"
+            
+            # Add all 5 levels for this dimension
+            levels_text = ""
+            for level, level_info in config['levels'].items():
+                levels_text += f"  Level {level} - {level_info['label']}: {level_info['description']}\n"
+            
+            formatted_definitions.append(dimension_text + levels_text)
+        
+        return "\n".join(formatted_definitions)
+
     def _format_user_priorities(self, user_weights: Dict[str, int]) -> str:
         """Formats user priorities with detailed descriptions for the LLM prompt."""
         formatted_priorities = []
