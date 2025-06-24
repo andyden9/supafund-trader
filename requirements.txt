@@ -5,4 +5,8 @@ openai
 python-dotenv
 pandas
 requests
-lark 
+lark
+fastapi
+uvicorn
+open-autonomy[all]
+open-aea-ledger-ethereum 

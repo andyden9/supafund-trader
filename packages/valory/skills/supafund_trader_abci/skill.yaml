@@ -1,0 +1,71 @@
+name: supafund_trader_abci
+author: valory
+version: 0.1.0
+type: skill
+description: The ABCI skill for the Supafund Trader agent.
+license: Apache-2.0
+aea_version: '>=1.0.0, <2.0.0'
+fingerprint:
+  __init__.py: bafybeic5irc3vq23kie54brmeqmzkqzco3ehkmybjsvbuc443enlxd4fxi
+  behaviours.py: bafybeiarguamj4ladl7al4x6ipzntazbycyy57kqnaj3mec5vkzpdmaxja
+  handlers.py: bafybeibickyivlv7zs2wovlwytzlhopxtwateng6reatuhejnr3ku4bazq
+  models.py: bafybeibldpj3tftnseasv3lyh6zrw6ilrtxeppnhhn754fj4nfkipmv6h4
+  payloads.py: bafybeiec6jn7xbox2e3c75hcgsvgx7ck6rm4wxwn5kuh4ilhy7nj25mczy
+  rounds.py: bafybeifezszky2w6s56nsc63mppppcdqlwciqlhzypqqgl5mbaefrapmqm
+fingerprint_ignore_patterns: []
+connections: []
+contracts: []
+protocols: []
+skills:
+- valory/abstract_round_abci:0.1.0:bafybeihyaubqrndsjkrplx4e2tn45jgddt52cxzuhb5iwiznz7qlhrbdbe
+dependencies: {}
+handlers:
+  abci:
+    class_name: ABCIHandler
+    args: {}
+  http:
+    class_name: HttpHandler
+    args: {}
+  signing:
+    class_name: SigningHandler
+    args: {}
+  tendermint:
+    class_name: TendermintHandler
+    args: {}
+is_abstract: false
+models:
+  params:
+    class_name: Params
+    args:
+      tendermint_url: ${str:http://localhost:26657}
+      tendermint_com_url: ${str:http://localhost:8080}
+      setup:
+        all_participants: ${list:[]}
+        safe_contract_address: ${str:null}
+        consensus_threshold: ${int:null}
+  shared_state:
+    class_name: SharedState
+    args:
+      initial_period: 0
+  requests:
+    class_name: Requests
+    args: {}
+  benchmark_tool:
+    class_name: BenchmarkTool
+    args:
+      log_dir: ${str:/benchmarks}
+  abci_app:
+    class_name: SupafundTraderAbciApp
+    args:
+      db:
+        initial_db:
+          cross_period_persisted_keys: []
+behaviours:
+  main:
+    class_name: SupafundTraderRoundBehaviour
+    args:
+      skill_context: {}
+  pinger:
+    class_name: Pinger
+    args:
+      ping_interval: 60

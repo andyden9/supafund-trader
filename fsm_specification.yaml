@@ -1,0 +1,33 @@
+alphabet_in:
+- DONE
+- NO_MAJORITY
+- ROUND_TIMEOUT
+- ERROR
+- NO_APPLICATIONS
+- NO_MORE_APPLICATIONS
+default_start_state: RegistrationRound
+final_states: []
+label: SupafundTraderAbciApp
+start_states:
+- RegistrationRound
+states:
+- AnalyzeApplicationRound
+- FetchApplicationsRound
+- RegistrationRound
+- ResetAndPauseRound
+transition_func:
+    (AnalyzeApplicationRound, DONE): AnalyzeApplicationRound
+    (AnalyzeApplicationRound, ERROR): ResetAndPauseRound
+    (AnalyzeApplicationRound, NO_MAJORITY): ResetAndPauseRound
+    (AnalyzeApplicationRound, NO_MORE_APPLICATIONS): ResetAndPauseRound
+    (AnalyzeApplicationRound, ROUND_TIMEOUT): ResetAndPauseRound
+    (FetchApplicationsRound, DONE): AnalyzeApplicationRound
+    (FetchApplicationsRound, ERROR): ResetAndPauseRound
+    (FetchApplicationsRound, NO_APPLICATIONS): ResetAndPauseRound
+    (FetchApplicationsRound, NO_MAJORITY): ResetAndPauseRound
+    (FetchApplicationsRound, ROUND_TIMEOUT): ResetAndPauseRound
+    (RegistrationRound, DONE): FetchApplicationsRound
+    (RegistrationRound, NO_MAJORITY): RegistrationRound
+    (RegistrationRound, ROUND_TIMEOUT): RegistrationRound
+    (ResetAndPauseRound, DONE): FetchApplicationsRound
+    (ResetAndPauseRound, ROUND_TIMEOUT): ResetAndPauseRound 
